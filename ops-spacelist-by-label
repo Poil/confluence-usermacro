@@ -1,0 +1,112 @@
+## @param Header:title=Table Header|type=string|required=true|desc=The title for table results.
+## @param Label:title=Space Category|type=string|required=true|desc=Categories you want to list spaces from, comma separated, for performance reason please put the less used category first.
+## @param DisplayPages:title=Display Pages|type=boolean|required=true|default=false|Desc=Display Space Pages
+## @param DisplayArchivedSpaces:title=Display Archived Spaces|type=boolean|required=true|default=false|Desc=Display Archived Spaces
+
+#set( $myList = $paramLabel.split(","))
+#set($myArray = [])
+
+#foreach ( $cat in $myList )
+    #set( $tmp = $myArray.add($cat) )
+#end
+
+#set( $mainCategory = $myArray.get(0))
+
+## try to get space category
+#set ( $spaceLabel = $action.labelManager.getLabel( "team:${mainCategory}" ) )
+
+## check if space category exists
+#if ( $!spaceLabel )
+    ## try to get spaces by category
+    #set ( $spaces = $action.labelManager.getSpacesWithLabel( $spaceLabel ) )
+	<table class="confluenceTable tablesorter tablesorter-default" style="width:90%; margin-left:5%">
+	<theader>
+		<tr>
+			<th  class="confluenceTh">${paramHeader} ${paramLabel}</th>
+		</tr>
+    </theader>
+    <tbody>
+    #foreach ( $space in $spaces )
+		#set ($firstloop = true)
+        #set ($spaceMatch = false)
+		#set ($firstlookup = true)
+        #set ($curSpaceLabels = $action.labelManager.getTeamLabelsForSpace($space.key))
+        #foreach ($label in $myList)
+            #set( $find = false)
+            #foreach ( $curSpaceLabel in $curSpaceLabels )
+                #if ($curSpaceLabel == $label)
+                    #set( $find = true )
+                #end
+            #end
+            #if ($find == false)
+                #set ($spaceMatch = false)
+            #elseif ($firstlookup == true)
+                #set ($spaceMatch = true)
+            #end
+			#set ($firstlookup = false)
+        #end
+        ## check if current user can view space and if all labels founded
+        #if ( $spaceMatch == true and $permissionHelper.canView($action.remoteUser, $space) and (!$space.isArchived() or $paramDisplayArchivedSpaces == true))
+        <tr>
+			#if ($paramDisplayPages == false)
+			<td class="confluenceTd">
+				<span class="icon icon-space">&nbsp;</span><span><a href="$!space.urlPath">$!space.name</a></span>
+			</td>
+			<td class="confluenceTd">
+				<a href="/display/$!space.key">
+					<div title="View Space">
+						<a class="icon icon-space" href="/display/$!space.key">Espace</a>
+					</div>
+				</a>
+			#else
+			<td class="confluenceTd">
+				#set ( $toppages = $pageManager.getTopLevelPages($space) )
+				#foreach ($toppage in $toppages)
+					<span class="icon icon-space">&nbsp;</span>
+					<a href="/display/$!space.key">$toppage.getDisplayTitle()</a>
+					#if ($firstloop == true)
+				<ul>
+					#end
+					#set ($firstloop = false)
+					#if ($toppage.hasChildren())
+						#set ($children = $toppage.getSortedChildren())
+						#foreach ($childpage in $children)
+							#if( $childpage.hasChildren() )
+								#set ($subchildren = $childpage.getSortedChildren())
+					<li onclick="jQuery(this).find('ul').slideToggle('slow');" style="list-style-type:circle; cursor:pointer">
+							#else
+					<li>
+							#end
+						<span class="icon icon-page">&nbsp;</span>
+						<a href="/display/$!space.key/$!childpage.getDisplayTitle()">$childpage.getDisplayTitle()</a>
+							#if( $childpage.hasChildren() )
+						<ul style="display: none">
+								#foreach ($subchildpage in $subchildren)
+							<li>
+								<span class="icon icon-page">&nbsp;</span>
+								<a href="/display/$!space.key/$!subchildpage.getDisplayTitle()">$subchildpage.getDisplayTitle()</a>
+							</li>
+								#end
+						</ul>
+							#end
+					</li>
+						#end
+					#end
+				#end
+				</ul>
+			#end
+			</td>
+		</tr>
+		#end
+	#end
+    </tbody>
+    </table>
+#else
+    <div class="aui-message warning">
+        <p class="title">
+            <span class="aui-icon icon-warning">Warning</span>
+            <strong>No spaces in these categories</strong>
+        </p>
+        <p>Couldn't find space categories <strong>$paramLabel</strong>!</p>
+    </div>
+#end
